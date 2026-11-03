@@ -16,6 +16,7 @@ st.set_page_config(page_title="쿠팡 파렛트 적재리스트 생성기", page
 REQUIRED_HEADERS = ['파렛트', 'SKU No', 'SKU NAME', 'box수량', '수량', '제조일자']
 TEMPLATE_PATH = Path(__file__).parent / '쿠팡 파렛트 양식.pptx'
 PRODUCTS_PATH = Path(__file__).parent / 'products.json'
+# GitHub 저장소 URL 수정 (coupang -> coupangpallet)
 GITHUB_PRODUCTS_URL = 'https://raw.githubusercontent.com/ccfeel2-beep/coupangpallet/main/products.json'
 
 
@@ -48,9 +49,11 @@ def parse_date(value):
             pass
     raise ValueError(f'날짜 형식을 확인할 수 없습니다: {text}')
 
+
 def korean_date(value):
     d = parse_date(value)
     return f'{d.month}월 {d.day}일'
+
 
 def dotted_date(value):
     d = parse_date(value)
@@ -69,13 +72,13 @@ def load_products_from_github():
     raw = json.loads(raw_bytes.decode('utf-8-sig'))
     return validate_products(raw)
 
+
 def load_products_file():
     if not PRODUCTS_PATH.exists():
         return []
     with open(PRODUCTS_PATH, 'r', encoding='utf-8-sig') as f:
         raw = json.load(f)
     return validate_products(raw)
-
 
 
 def initialize_products():
@@ -145,7 +148,7 @@ def read_excel(file_obj):
         records.append(rec)
     if not records:
         raise ValueError('파렛트가 지정된 상품 행이 없습니다.')
-    missing = [k for k in ('입고예정일자','납품센터명','발주센터명','발주번호') if not meta.get(k)]
+    missing = [k for k in ('입고예정일자', '납품센터명', '발주센터명', '발주번호') if not meta.get(k)]
     if missing:
         raise ValueError('기본 정보가 비어 있습니다: ' + ', '.join(missing))
     return meta, records
@@ -284,6 +287,7 @@ def validate_job(meta, records):
                 raise ValueError(f'{i}번째 상품의 {field}은 0 이상의 숫자여야 합니다.')
 
 
+# 세션 상태 초기화
 if 'products' not in st.session_state:
     initial_products, initial_source, initial_error = initialize_products()
     st.session_state.products = initial_products
@@ -293,6 +297,14 @@ if 'pallet_items' not in st.session_state:
     st.session_state.pallet_items = {}
 if 'next_item_id' not in st.session_state:
     st.session_state.next_item_id = 1
+
+# 수량 입력 시 BOX 수량 자동 동기화 콜백 함수
+def sync_box_qty(pallet_no, item_id):
+    qty_key = f'manual_qty_{pallet_no}_{item_id}'
+    box_key = f'manual_box_{pallet_no}_{item_id}'
+    if qty_key in st.session_state:
+        st.session_state[box_key] = st.session_state[qty_key]
+
 
 st.title('📦 쿠팡 파렛트 적재리스트 생성기')
 st.write('엑셀 업로드 또는 웹 직접 입력으로 파렛트 적재리스트 PPT를 만듭니다.')
@@ -368,14 +380,13 @@ else:
         delivery_date = c1.date_input('입고예정일자', value=date.today())
         order_no = c2.text_input('발주번호')
 
-        # 세션 상태에 기본 센터명이 없으면 '인천17'로 초기화
+        # 세션 상태에 기본 센터명이 없으면 '인천17센터'로 초기화 및 변경값 유지
         if 'delivery_center' not in st.session_state:
             st.session_state.delivery_center = '인천17센터'
         if 'order_center' not in st.session_state:
             st.session_state.order_center = '인천17센터'
 
         c3, c4 = st.columns(2)
-        # key 매개변수를 지정하면 사용자가 바꾼 값이 st.session_state에 자동으로 저장되고 고정됩니다.
         delivery_center = c3.text_input('납품센터명', key='delivery_center')
         order_center = c4.text_input('발주센터명', key='order_center')
 
@@ -383,16 +394,20 @@ else:
         st.divider()
         st.subheader('파렛트별 상품 배치')
         pallet_count = st.number_input('파렛트 개수', min_value=1, max_value=50, value=6, step=1)
-        # 수정: active_products를 sku_no 기준(오름차순)으로 정렬
+        
         active_products = [p for p in st.session_state.products if p['active']]
         if not active_products:
             st.warning('사용 중인 상품이 없습니다. 상품 관리 메뉴에서 상품을 등록하거나 사용 중으로 변경해 주세요.')
         else:
-            # sku_no를 기준으로 정렬 (숫자/문자 오름차순)
-            sorted_active_products = sorted(active_products, key=lambda p: str(p['sku_no']))
+            # sku_no를 기준으로 오름차순 정렬 (숫자 우선)
+            sorted_active_products = sorted(
+                active_products, 
+                key=lambda p: int(p['sku_no']) if str(p['sku_no']).isdigit() else str(p['sku_no'])
+            )
             product_labels = {f"{p['sku_no']} | {p['sku_name']}": p for p in sorted_active_products}  
             labels = list(product_labels.keys())
             manual_records = []
+            
             for pallet_no in range(1, int(pallet_count) + 1):
                 with st.expander(f'파렛트 {pallet_no}', expanded=(pallet_no == 1)):
                     if pallet_no not in st.session_state.pallet_items:
@@ -403,13 +418,37 @@ else:
                     for item_id in list(item_ids):
                         a, b, c, d = st.columns([3.5, 1, 1, 0.35])
                         selected_label = a.selectbox('상품', labels, key=f'manual_product_{pallet_no}_{item_id}', label_visibility='collapsed')
-                        box_qty = b.number_input('BOX 수량', min_value=0, step=1, key=f'manual_box_{pallet_no}_{item_id}', label_visibility='collapsed')
-                        qty = c.number_input('수량', min_value=0, step=1, key=f'manual_qty_{pallet_no}_{item_id}', label_visibility='collapsed')
+                        
+                        box_key = f'manual_box_{pallet_no}_{item_id}'
+                        qty_key = f'manual_qty_{pallet_no}_{item_id}'
+
+                        if box_key not in st.session_state:
+                            st.session_state[box_key] = 0
+                        if qty_key not in st.session_state:
+                            st.session_state[qty_key] = 0
+
+                        # 수량 입력창 (수량 변경 시 sync_box_qty 콜백 실행)
+                        qty = c.number_input(
+                            '수량', min_value=0, step=1, 
+                            key=qty_key, 
+                            on_change=sync_box_qty, 
+                            args=(pallet_no, item_id), 
+                            label_visibility='collapsed'
+                        )
+                        # BOX 수량 입력창 (수량 변경 시 따라가고, 수동 수정 시 개별 반영)
+                        box_qty = b.number_input(
+                            'BOX 수량', min_value=0, step=1, 
+                            key=box_key, 
+                            label_visibility='collapsed'
+                        )
+
                         if d.button('✕', key=f'delete_item_{pallet_no}_{item_id}', help='이 상품 행 삭제', use_container_width=True):
                             st.session_state.pallet_items[pallet_no].remove(item_id)
                             st.rerun()
+                            
                         chosen = product_labels[selected_label]
                         manual_records.append({'파렛트': str(pallet_no), 'SKU No': chosen['sku_no'], 'SKU NAME': chosen['sku_name'], 'box수량': box_qty, '수량': qty, '제조일자': dotted_date(delivery_date)})
+                        
                     if st.button('＋ 상품 추가', key=f'add_row_{pallet_no}', use_container_width=True):
                         st.session_state.pallet_items[pallet_no].append(st.session_state.next_item_id)
                         st.session_state.next_item_id += 1
