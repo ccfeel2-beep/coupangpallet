@@ -16,7 +16,7 @@ st.set_page_config(page_title="쿠팡 파렛트 적재리스트 생성기", page
 REQUIRED_HEADERS = ['파렛트', 'SKU No', 'SKU NAME', 'box수량', '수량', '제조일자']
 TEMPLATE_PATH = Path(__file__).parent / '쿠팡 파렛트 양식.pptx'
 PRODUCTS_PATH = Path(__file__).parent / 'products.json'
-GITHUB_PRODUCTS_URL = 'https://raw.githubusercontent.com/ccfeel2-beep/coupang/main/products.json'
+GITHUB_PRODUCTS_URL = 'https://raw.githubusercontent.com/ccfeel2-beep/coupangpallet/main/products.json'
 
 
 def norm(v):
