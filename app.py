@@ -370,9 +370,9 @@ else:
 
         # 세션 상태에 기본 센터명이 없으면 '인천17'로 초기화
         if 'delivery_center' not in st.session_state:
-            st.session_state.delivery_center = '인천17'
+            st.session_state.delivery_center = '인천17센터'
         if 'order_center' not in st.session_state:
-            st.session_state.order_center = '인천17'
+            st.session_state.order_center = '인천17센터'
 
         c3, c4 = st.columns(2)
         # key 매개변수를 지정하면 사용자가 바꾼 값이 st.session_state에 자동으로 저장되고 고정됩니다.
