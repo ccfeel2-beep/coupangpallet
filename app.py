@@ -367,9 +367,18 @@ else:
         c1, c2 = st.columns(2)
         delivery_date = c1.date_input('입고예정일자', value=date.today())
         order_no = c2.text_input('발주번호')
+
+        # 세션 상태에 기본 센터명이 없으면 '인천17'로 초기화
+        if 'delivery_center' not in st.session_state:
+            st.session_state.delivery_center = '인천17'
+        if 'order_center' not in st.session_state:
+            st.session_state.order_center = '인천17'
+
         c3, c4 = st.columns(2)
-        delivery_center = c3.text_input('납품센터명')
-        order_center = c4.text_input('발주센터명')
+        # key 매개변수를 지정하면 사용자가 바꾼 값이 st.session_state에 자동으로 저장되고 고정됩니다.
+        delivery_center = c3.text_input('납품센터명', key='delivery_center')
+        order_center = c4.text_input('발주센터명', key='order_center')
+
         st.caption('업체명: 주식회사 봉우리 (자동 입력) · 제조일자는 입고예정일자와 동일하게 자동 적용됩니다.')
         st.divider()
         st.subheader('파렛트별 상품 배치')
