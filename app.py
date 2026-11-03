@@ -306,7 +306,7 @@ else:
     with tab_products:
         st.subheader('상품 목록 관리')
         st.caption('상품 목록 원본은 GitHub 저장소의 products.json입니다. 사이트 접속 시 자동으로 불러오며, 중지 상품은 파렛트 입력 드롭다운에 표시되지 않습니다.')
-        st.caption('GitHub 원본: ccfeel2-beep/coupang · main / products.json')
+        st.caption('GitHub 원본: ccfeel2-beep/coupangpallet · main / products.json')
 
         if st.session_state.get('products_load_error'):
             st.warning(st.session_state.products_load_error)
